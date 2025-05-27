@@ -1,39 +1,58 @@
+import logging
 import os
-import paho.mqtt.client as mqtt
+import sys
+import time
+from pathlib import Path
+
+import schedule
+
+from mqtt.publish_service import PublishService
+from utils import file_utils
+
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+
+console_handler = logging.StreamHandler(sys.stdout)
+console_handler.setLevel(logging.INFO)
+formatter = logging.Formatter('%(asctime)s [%(levelname)s] %(name)s: %(message)s')
+console_handler.setFormatter(formatter)
+
+logger.addHandler(console_handler)
+
 
 def main():
-    try:
-        irk = os.getenv("ES_PRESENSE_IRK", None)
-        device_id = os.getenv("ES_PRESENSE_DEVICE_ID", None)
-        device_name = os.getenv("ES_PRESENSE_DEVICE_NAME", None)
-        if not irk and not device_id and not device_name:
-            print(f"Missing env vars for ES_PRESENSE_IRK, ES_RESENSE_DEVICE_ID, or ES_PRESENSE_DEVICE_NAME")
-            exit(1)
+    settings_file_str = os.getenv("SETTINGS_FILE", None)
+    if not settings_file_str:
+        logger.error(f"Failed to get env var SETTINGS_FILE")
+        exit(1)
 
-        mqtt_host = os.getenv("MQTT_HOST")
-        mqtt_port = os.getenv("MQTT_PORT", 1883)
-        if not mqtt_host:
-            print("Missing env var for MQTT_PORT")
-            exit(1)
+    settings_file = Path(settings_file_str)
+    if not settings_file.exists() or not settings_file.is_file():
+        logger.error(f"Invalid settings file: {settings_file}")
+        exit(4)
 
-        client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
-        client.connect(mqtt_host, mqtt_port, 60)
+    settings = file_utils.read_json_from_file(settings_file)
 
-        response = client.publish(
-            topic=f'espresense/settings/{irk}/config',
-            payload=str({"id": device_id, "name": device_name})
+    if len(settings) < 1:
+        logger.error(f"Invalid settings!")
+        exit(4)
+
+    logger.info("Start publishing settings...")
+    service = PublishService()
+    for setting in settings:
+        service.publish(
+            topic=f"espresense/settings/{setting['irk']}/config",
+            message=str({"id":setting['id'], "name":setting['name']})
         )
-        client.disconnect()
 
-        if response.rc == 0:
-            print(f"Success!")
-            exit(0)
-        else:
-            print(f"Failed to publish settings. Status: {response.rc}")
-            exit(2)
-    except Exception as e:
-        print(f'Failed to publish settings due to error: {e}')
-        exit(3)
+def run_scheduler():
+    schedule_minutes = os.getenv("SCHEDULE_MINUTES", 15)
+    schedule.every(schedule_minutes).minutes.do(main)
+
+    logger.info(f"Starting scheduler every {schedule_minutes} minutes...")
+    while True:
+        schedule.run_pending()
+        time.sleep(1)
 
 if __name__ == "__main__":
-    main()
+    run_scheduler()
