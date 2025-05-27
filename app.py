@@ -6,7 +6,7 @@ from pathlib import Path
 
 import schedule
 
-from mqtt.publish_service import PublishService
+from mqtt_service.publish_service import PublishService
 from utils import file_utils
 
 logger = logging.getLogger()
