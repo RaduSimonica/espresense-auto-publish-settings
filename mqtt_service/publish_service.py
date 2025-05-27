@@ -9,7 +9,7 @@ class PublishService(object):
 
     def __init__(self):
         self.host = os.getenv("MQTT_HOST", None)
-        self.port = os.getenv("MQTT_PORT", 1883)
+        self.port = int(os.getenv("MQTT_PORT", 1883))
 
         if not self.host:
             logger.error("Cannot find MQTT_HOST env var.")
