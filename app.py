@@ -46,7 +46,7 @@ def main():
         )
 
 def run_scheduler():
-    schedule_minutes = os.getenv("SCHEDULE_MINUTES", 15)
+    schedule_minutes = int(os.getenv("SCHEDULE_MINUTES", 15))
     schedule.every(schedule_minutes).minutes.do(main)
 
     logger.info(f"Starting scheduler every {schedule_minutes} minutes...")
